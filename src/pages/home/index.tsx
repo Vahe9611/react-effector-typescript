@@ -1,21 +1,36 @@
-import React, {useEffect} from "react";
-import { useStore } from "effector-react";
+import React, {useCallback, useEffect, useState} from "react";
+import { useStore, useStoreMap } from "effector-react";
 import { $weather, fetchWeatherFx} from '../../models/weather';
 
 import Weather from "../../components/Weather";
 import Loader from '../../components/Loader/index';
+import ForestType from '../../components/ForestType/index';
 
-import "./index.css";
-
-export const Home: React.FC = () => {
+const Home: React.FC = () => {
+  const [forestType, setForestType] = useState<'hourly' | 'daily'>('hourly')
   const isLoading = useStore(fetchWeatherFx.pending)
-  const weather = useStore($weather);
+
+  const weather = useStoreMap({
+    store: $weather,
+    keys: [forestType],
+    fn: (weather, [forestType]) => {
+      if (!weather) return null;
+
+      let data: any[] = weather[forestType]
+      
+      if(forestType === 'daily') {
+        return data.map((item: any) => ({...item, temp: item.temp.day}));
+      }
+
+      return data;
+    }
+  })
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const {latitude, longitude} = position.coords
-        fetchWeatherFx({ lat: latitude, lon: longitude })
+        fetchWeatherFx({ lat: latitude, lon: longitude, units: 'metric' })
       },
       (error) => {
         console.log("error is :", error);
@@ -23,19 +38,31 @@ export const Home: React.FC = () => {
       },
     );
   }, [])
-  
-  useEffect(() => {
-    console.log(weather);
-  }, [weather])
+
+  const handleSetType = useCallback((value) => {
+    setForestType(value)
+  }, [])
 
   return (
-    <main className="page page--home">
-      <section className="hero">
-        {
-          isLoading ? <Loader /> : 
-          <Weather />
-        }
-      </section>
+    <main>
+      <article>
+        <header>
+          <ForestType 
+            value={forestType}
+            onChange={handleSetType}
+          />
+        </header>
+        <section>
+          {
+            isLoading || !weather ? <Loader /> : 
+            <Weather 
+            value={weather}
+            />
+          }
+        </section>
+      </article>
     </main>
   );
 };
+
+export default Home;
